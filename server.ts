@@ -27,6 +27,44 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
+// Robust Gemini execution helper with automatic model fallback & retry
+// Handles 503 UNAVAILABLE (high demand spikes), 429, and transient timeouts
+async function generateGeminiWithFallback(
+  ai: GoogleGenAI,
+  params: {
+    contents: any;
+    config?: any;
+    primaryModel?: string;
+  }
+) {
+  const candidateModels = [
+    params.primaryModel || "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+  ];
+
+  let lastError: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config,
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = String(err?.message || err);
+      console.warn(`[Gemini] Model ${model} encountered issue (${errMsg.slice(0, 140)}). Trying fallback model...`);
+      // Brief 150ms backoff before attempting next candidate
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+
+  throw lastError;
+}
+
 const SYSTEM_GUIDE_INSTRUCTION = `You are the Ascension Guide—a grounded, disciplined, and thoughtful AI mentor for universal personal mastery and faceless storytelling.
 
 Core Philosophy:
@@ -117,8 +155,7 @@ Determine whether each of the 5 Universal Disciplines was Completed (true) or Mi
 Also extract the day number if mentioned, or default to ${day}.
 Provide a grounded, calm 1% reflection (2-3 sentences) evaluating their day. If disciplines were missed, provide encouraging, guilt-free perspective to resume tomorrow with clarity. If successful, encourage quiet humility and steady consistency.`;
 
-        const geminiRes = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
+        const geminiRes = await generateGeminiWithFallback(ai, {
           contents: parsePrompt,
           config: {
             systemInstruction: SYSTEM_GUIDE_INSTRUCTION,
@@ -303,8 +340,7 @@ Adhere strictly to the Faceless Content Creation Framework:
 
     let parsed: any = null;
     try {
-      const geminiRes = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+      const geminiRes = await generateGeminiWithFallback(ai, {
         contents: scriptPrompt,
         config: {
           systemInstruction: SYSTEM_GUIDE_INSTRUCTION,
@@ -394,8 +430,7 @@ ${streakSummary}
 Address the seeker with grounded, calm, articulate, and disciplined wisdom.
 Do not use hype or buzzwords. Speak with philosophical depth, emotional stillness, and practical clarity.`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
+        const response = await generateGeminiWithFallback(ai, {
           contents: [
             {
               role: "user",

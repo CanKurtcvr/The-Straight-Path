@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import {
   Compass,
   Wind,
@@ -91,7 +92,7 @@ export const ISLAND_NPCS: IslandNPC[] = [
       'What is the highest virtue of a faceless creator?',
       'Teach me the principle of quiet stewardship of the soul.',
     ],
-    localPos: { x: 14, y: 6.0, z: -16 },
+    localPos: { x: 5.5, y: 6.0, z: 0 },
   },
   {
     id: 'npc-zahra',
@@ -407,22 +408,26 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
   // UI States
   const [speedKnots, setSpeedKnots] = useState(0);
-  const [altitudeMeters, setAltitudeMeters] = useState(120);
+  const [altitudeMeters, setAltitudeMeters] = useState(36);
   const [currentIsland, setCurrentIsland] = useState<HabitIsland | null>(null);
   const [nearSanctuary, setNearSanctuary] = useState<WorldArea | null>(null);
   const [nearSanctuaryIsland, setNearSanctuaryIsland] = useState<HabitIsland | null>(null);
   const [collectedEssence, setCollectedEssence] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [cameraMode, setCameraMode] = useState<'chase' | 'cinematic' | 'firstPerson'>('chase');
-  const [flightState, setFlightState] = useState<'SOARING' | 'GLIDING' | 'DIVING' | 'BOOSTING' | 'PERCHED'>('SOARING');
+  const [flightState, setFlightState] = useState<'SOARING' | 'GLIDING' | 'DIVING' | 'BOOSTING' | 'PERCHED'>('PERCHED');
   const [isDofEnabled, setIsDofEnabled] = useState(true);
+  const [bloomEnabled, setBloomEnabled] = useState(true);
+  const [invertPitch, setInvertPitch] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [headingDegrees, setHeadingDegrees] = useState(0);
 
   // Character & Gear Panel States (Land Transformation Feature)
   const [isGearPanelOpen, setIsGearPanelOpen] = useState(false);
-  const [isGroundedUI, setIsGroundedUI] = useState(false);
+  const [isGroundedUI, setIsGroundedUI] = useState(true);
+  const [showIntroGuide, setShowIntroGuide] = useState(true);
+  const [introStep, setIntroStep] = useState<1 | 2 | 3>(1);
   const [transformToast, setTransformToast] = useState<string | null>(null);
   const transformToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -462,7 +467,15 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
   const isDofEnabledRef = useRef(isDofEnabled);
   isDofEnabledRef.current = isDofEnabled;
 
-  const wasGroundedRef = useRef(false);
+  const invertPitchRef = useRef(invertPitch);
+  invertPitchRef.current = invertPitch;
+
+  const bloomEnabledRef = useRef(bloomEnabled);
+  bloomEnabledRef.current = bloomEnabled;
+
+  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
+
+  const wasGroundedRef = useRef(true);
 
   // Open Chat with specific NPC
   const handleOpenNPCChat = useCallback((npc: IslandNPC) => {
@@ -564,19 +577,19 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
   // Flight physics state
   const physicsRef = useRef({
-    pos: new THREE.Vector3(0, 120, 150),
-    vel: new THREE.Vector3(0, 0, -15),
-    speed: 16,
+    pos: new THREE.Vector3(0, 36, -38),
+    vel: new THREE.Vector3(0, 0, 0),
+    speed: 0,
     maxSpeed: 48,
     minSpeed: 4,
     boostMultiplier: 1.0,
     pitch: 0,
     yaw: 0,
     roll: 0,
-    isGrounded: false,
+    isGrounded: true,
     flappingWingPhase: 0,
     wingFlapSpeed: 6.0,
-    isGliding: true,
+    isGliding: false,
     keys: {
       KeyW: false,
       KeyS: false,
@@ -591,6 +604,8 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
     mouseDrag: false,
     prevMouse: { x: 0, y: 0 },
     orbitOffset: new THREE.Vector2(0, 0),
+    camYaw: 0,
+    camPitch: 0.18,
   });
 
   // Handle Land & Enter Area
@@ -1139,12 +1154,165 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         prism.position.y = 20;
         landmarkGroup.add(prism);
       } else {
-        const sundialPillar = new THREE.Mesh(
-          new THREE.ConeGeometry(8, 30, 8),
-          new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7, roughness: 0.3 })
+        // --- THE NEXUS INTRODUCTORY STRAIGHT SANCTUARY WALKWAY ---
+        const pathGroup = new THREE.Group();
+
+        // 1. Dark slate paver road base (spanning Z = -44 to +44, exactly aligned with Z axis)
+        const paverMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(8.0, 0.4, 88),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8, metalness: 0.2 })
         );
-        sundialPillar.position.y = 15;
-        landmarkGroup.add(sundialPillar);
+        paverMesh.position.set(0, 0.2, 0);
+        paverMesh.receiveShadow = true;
+        pathGroup.add(paverMesh);
+
+        // Golden Rune Runner down the exact center
+        const runeStripMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1.8, 0.45, 88),
+          new THREE.MeshStandardMaterial({
+            color: 0xf59e0b,
+            emissive: 0xd97706,
+            emissiveIntensity: 0.4,
+            roughness: 0.4,
+          })
+        );
+        runeStripMesh.position.set(0, 0.22, 0);
+        pathGroup.add(runeStripMesh);
+
+        // Side Stone Border Curbs
+        const leftCurb = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.6, 88),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 })
+        );
+        leftCurb.position.set(-4.1, 0.3, 0);
+        pathGroup.add(leftCurb);
+
+        const rightCurb = leftCurb.clone();
+        rightCurb.position.x = 4.1;
+        pathGroup.add(rightCurb);
+
+        // 2. Starting Moon Gate / Arch of Intention at Z = -42 (behind the player start)
+        const archGroup = new THREE.Group();
+        archGroup.position.set(0, 0, -42);
+
+        const pillarLeft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.65, 0.75, 8, 16),
+          new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 })
+        );
+        pillarLeft.position.set(-4.5, 4, 0);
+        archGroup.add(pillarLeft);
+
+        const pillarRight = pillarLeft.clone();
+        pillarRight.position.x = 4.5;
+        archGroup.add(pillarRight);
+
+        const archLintel = new THREE.Mesh(
+          new THREE.BoxGeometry(11, 1.2, 1.4),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+        );
+        archLintel.position.set(0, 8.2, 0);
+        archGroup.add(archLintel);
+
+        const crownJewel = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.8, 0),
+          new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.9 })
+        );
+        crownJewel.position.set(0, 9.4, 0);
+        archGroup.add(crownJewel);
+
+        pathGroup.add(archGroup);
+
+        // 3. Runway of Glowing Stone Lantern Pedestals along the straight path
+        const lanternZCoords = [-32, -20, -10, 10, 20, 32];
+        lanternZCoords.forEach((lz) => {
+          [-4.8, 4.8].forEach((lx) => {
+            const pedestal = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.35, 0.45, 2.4, 8),
+              new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+            );
+            pedestal.position.set(lx, 1.2, lz);
+            pathGroup.add(pedestal);
+
+            const lanternOrb = new THREE.Mesh(
+              new THREE.SphereGeometry(0.38, 12, 12),
+              new THREE.MeshStandardMaterial({
+                color: 0xfbbf24,
+                emissive: 0xf59e0b,
+                emissiveIntensity: 1.2,
+                roughness: 0.2,
+              })
+            );
+            lanternOrb.position.set(lx, 2.6, lz);
+            pathGroup.add(lanternOrb);
+          });
+        });
+
+        // 4. Center Astral Sundial Plaza at Z = 0
+        const plazaBase = new THREE.Mesh(
+          new THREE.CylinderGeometry(14, 15, 0.45, 32),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
+        );
+        plazaBase.position.set(0, 0.22, 0);
+        pathGroup.add(plazaBase);
+
+        // Gilded Astral Rings Monument (offset to left at X = -7.5, leaving path open for walking straight)
+        const sundialBase = new THREE.Mesh(
+          new THREE.CylinderGeometry(3, 4, 1.8, 16),
+          new THREE.MeshStandardMaterial({ color: 0x334155 })
+        );
+        sundialBase.position.set(-7.5, 1.0, 0);
+        pathGroup.add(sundialBase);
+
+        const sundialRings = new THREE.Mesh(
+          new THREE.TorusGeometry(3.5, 0.25, 12, 32),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.8, roughness: 0.2 })
+        );
+        sundialRings.rotation.x = Math.PI / 4;
+        sundialRings.position.set(-7.5, 3.2, 0);
+        pathGroup.add(sundialRings);
+
+        const gnomonPillar = new THREE.Mesh(
+          new THREE.ConeGeometry(0.5, 6, 8),
+          new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7 })
+        );
+        gnomonPillar.position.set(-7.5, 4.0, 0);
+        pathGroup.add(gnomonPillar);
+
+        // 5. Introductory Inscription Steles along the walkway
+        const stele1 = new THREE.Mesh(
+          new THREE.BoxGeometry(1.0, 2.6, 0.3),
+          new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 })
+        );
+        stele1.position.set(-4.8, 1.3, -20);
+        pathGroup.add(stele1);
+
+        const stele2 = stele1.clone();
+        stele2.position.set(-4.8, 1.3, 20);
+        pathGroup.add(stele2);
+
+        // 6. The Celestial Flight Overlook Terrace at Z = +42
+        const terrace = new THREE.Mesh(
+          new THREE.CylinderGeometry(8, 9, 0.5, 24, 1, false, 0, Math.PI),
+          new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 })
+        );
+        terrace.rotation.y = -Math.PI / 2;
+        terrace.position.set(0, 0.25, 43);
+        pathGroup.add(terrace);
+
+        // Luminous Flight Launchpad Ring at Overlook
+        const launchRing = new THREE.Mesh(
+          new THREE.TorusGeometry(3.6, 0.2, 12, 32),
+          new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            emissive: 0x0284c7,
+            emissiveIntensity: 0.9,
+          })
+        );
+        launchRing.rotation.x = Math.PI / 2;
+        launchRing.position.set(0, 0.35, 41);
+        pathGroup.add(launchRing);
+
+        landmarkGroup.add(pathGroup);
       }
 
       islandRoot.add(landmarkGroup);
@@ -1224,6 +1392,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
     // 7. BUILD THE MAJESTIC SPIRITUAL WHITE BIRD
     const birdRoot = new THREE.Group();
     const birdBody = new THREE.Group();
+    birdBody.visible = false; // Initially grounded with Wayfarer character
     birdRoot.add(birdBody);
 
     // Materials for White Bird
@@ -1484,7 +1653,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
     // ==========================================
     const humanoidBody = new THREE.Group();
     humanoidBody.position.set(0, 0, 0);
-    humanoidBody.visible = false; // Initially airborne
+    humanoidBody.visible = true; // Start with character visible
     birdRoot.add(humanoidBody);
 
     // Gear visual styling from character.equipment
@@ -1788,17 +1957,65 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
     const leftTrail = createTrailSystem(0x7dd3fc);
     const rightTrail = createTrailSystem(0xfde047);
 
-    // 8. DEPTH OF FIELD POST-PROCESSING (EffectComposer + BokehPass)
+    // 8. POST-PROCESSING (EffectComposer + Bloom + Depth of Field)
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight),
+      0.45, // strength
+      0.35, // radius
+      0.82  // threshold
+    );
+    bloomPassRef.current = bloomPass;
+    composer.addPass(bloomPass);
+
     const bokehPass = new BokehPass(scene, camera, {
       focus: 14.0,
-      aperture: 0.00014,
-      maxblur: 0.016,
+      aperture: 0.00010,
+      maxblur: 0.012,
     });
     composer.addPass(bokehPass);
+
+    // Dynamic Speedlines / Wind Streak Particle System
+    const speedlineCount = 48;
+    const speedlineGeo = new THREE.BufferGeometry();
+    const speedlinePos = new Float32Array(speedlineCount * 6);
+    for (let i = 0; i < speedlineCount; i++) {
+      const sx = (Math.random() - 0.5) * 24;
+      const sy = (Math.random() - 0.5) * 14;
+      const sz = (Math.random() - 0.5) * 36;
+      const len = 4.0 + Math.random() * 6.0;
+      speedlinePos[i * 6] = sx;
+      speedlinePos[i * 6 + 1] = sy;
+      speedlinePos[i * 6 + 2] = sz;
+      speedlinePos[i * 6 + 3] = sx;
+      speedlinePos[i * 6 + 4] = sy;
+      speedlinePos[i * 6 + 5] = sz - len;
+    }
+    speedlineGeo.setAttribute('position', new THREE.BufferAttribute(speedlinePos, 3));
+    const speedlineMat = new THREE.LineBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    const speedlineMesh = new THREE.LineSegments(speedlineGeo, speedlineMat);
+    scene.add(speedlineMesh);
+
+    // Ground Contact Drop Shadow Disc (grounding character & bird cleanly to surface)
+    const contactShadowGeo = new THREE.CircleGeometry(1.6, 24);
+    const contactShadowMat = new THREE.MeshBasicMaterial({
+      color: 0x070b10,
+      transparent: true,
+      opacity: 0.38,
+      depthWrite: false,
+    });
+    const contactShadow = new THREE.Mesh(contactShadowGeo, contactShadowMat);
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.y = 0.05;
+    scene.add(contactShadow);
 
     // 9. Key Listeners for Flight Controls
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1815,6 +2032,11 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       if (e.code in keys) {
         keys[e.code as keyof typeof keys] = true;
       }
+      if (e.code === 'ArrowUp') keys.KeyW = true;
+      if (e.code === 'ArrowDown') keys.KeyS = true;
+      if (e.code === 'ArrowLeft') keys.KeyA = true;
+      if (e.code === 'ArrowRight') keys.KeyD = true;
+
       if (e.code === 'KeyT') {
         if (nearNPCRef.current) {
           handleOpenNPCChat(nearNPCRef.current);
@@ -1822,7 +2044,12 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         }
       }
       if (e.code === 'KeyE') {
-        handleEnterNearestSanctuary();
+        if (nearNPCRef.current) {
+          handleOpenNPCChat(nearNPCRef.current);
+          e.preventDefault();
+        } else {
+          handleEnterNearestSanctuary();
+        }
       }
       if (e.code === 'KeyC') {
         setCameraMode((prev) => (prev === 'chase' ? 'cinematic' : prev === 'cinematic' ? 'firstPerson' : 'chase'));
@@ -1851,8 +2078,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
           soundSynth.playItemObtain();
           transformAnimTime = 0.9;
           setIsGroundedUI(true);
-          setIsGearPanelOpen(true);
-          triggerTransformToastRef.current('Touched Island Sanctuary — Spiritual Form & Gear Manifested!');
+          triggerTransformToastRef.current('Landed — Transformed to Wayfarer [Press G for Gear]');
         }
       }
     };
@@ -1862,6 +2088,10 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       if (e.code in keys) {
         keys[e.code as keyof typeof keys] = false;
       }
+      if (e.code === 'ArrowUp') keys.KeyW = false;
+      if (e.code === 'ArrowDown') keys.KeyS = false;
+      if (e.code === 'ArrowLeft') keys.KeyA = false;
+      if (e.code === 'ArrowRight') keys.KeyD = false;
     };
 
     // Canvas click: raycast to talkable NPCs
@@ -1884,7 +2114,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       }
     };
 
-    // Mouse drag for 360 camera orbit
+    // Mouse drag for 360 camera orbit (smooth, normal orbit)
     const handleMouseDown = (e: MouseEvent) => {
       physicsRef.current.mouseDrag = true;
       physicsRef.current.prevMouse = { x: e.clientX, y: e.clientY };
@@ -1896,14 +2126,57 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       const dy = e.clientY - physicsRef.current.prevMouse.y;
       physicsRef.current.prevMouse = { x: e.clientX, y: e.clientY };
 
-      physicsRef.current.orbitOffset.x -= dx * 0.005;
-      physicsRef.current.orbitOffset.y = Math.max(
-        -0.85,
-        Math.min(0.85, physicsRef.current.orbitOffset.y + dy * 0.005)
-      );
+      const sens = 0.0035;
+      if (physicsRef.current.isGrounded) {
+        physicsRef.current.camYaw += dx * sens;
+        physicsRef.current.camPitch = Math.max(
+          -0.25,
+          Math.min(0.7, physicsRef.current.camPitch + dy * sens)
+        );
+      } else {
+        physicsRef.current.orbitOffset.x += dx * sens;
+        physicsRef.current.orbitOffset.y = Math.max(
+          -0.65,
+          Math.min(0.65, physicsRef.current.orbitOffset.y + dy * sens)
+        );
+      }
     };
 
     const handleMouseUp = () => {
+      physicsRef.current.mouseDrag = false;
+    };
+
+    // Touch events for mobile/trackpad touch
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        physicsRef.current.mouseDrag = true;
+        physicsRef.current.prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!physicsRef.current.mouseDrag || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - physicsRef.current.prevMouse.x;
+      const dy = e.touches[0].clientY - physicsRef.current.prevMouse.y;
+      physicsRef.current.prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+      const sens = 0.004;
+      if (physicsRef.current.isGrounded) {
+        physicsRef.current.camYaw += dx * sens;
+        physicsRef.current.camPitch = Math.max(
+          -0.25,
+          Math.min(0.7, physicsRef.current.camPitch + dy * sens)
+        );
+      } else {
+        physicsRef.current.orbitOffset.x += dx * sens;
+        physicsRef.current.orbitOffset.y = Math.max(
+          -0.65,
+          Math.min(0.65, physicsRef.current.orbitOffset.y + dy * sens)
+        );
+      }
+    };
+
+    const handleTouchEnd = () => {
       physicsRef.current.mouseDrag = false;
     };
 
@@ -1913,6 +2186,9 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
     canvas.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
 
     // 10. Resize Observer
     const resizeObserver = new ResizeObserver((entries) => {
@@ -1923,6 +2199,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
           camera.updateProjectionMatrix();
           renderer.setSize(width, height);
           composer.setSize(width, height);
+          bloomPass.setSize(width, height);
         }
       }
     });
@@ -1930,13 +2207,15 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
     // 11. CAMERA PHYSICS & SWAY ANIMATION STATE
     const camPhysics = {
-      pos: new THREE.Vector3(0, 125, 170),
-      lookAt: new THREE.Vector3(0, 120, 150),
+      pos: new THREE.Vector3(0, 38.8, -46.5),
+      lookAt: new THREE.Vector3(0, 37.8, -30),
       roll: 0,
-      baseDist: 14.5,
-      baseHeight: 4.2,
+      baseDist: 8.0,
+      baseHeight: 2.8,
       swayTime: 0,
     };
+    camera.position.copy(camPhysics.pos);
+    camera.lookAt(camPhysics.lookAt);
 
     // 12. REAL TIME ANIMATION & FLIGHT LOOP
     let animationFrameId: number;
@@ -1966,79 +2245,124 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         setFlightState('PERCHED');
         p.isGliding = false;
 
-        // Ground walking physics
-        let moveX = 0;
-        let moveZ = 0;
-        if (keys.KeyW) moveZ -= 1;
-        if (keys.KeyS) moveZ += 1;
-        if (keys.KeyA) moveX -= 1;
-        if (keys.KeyD) moveX += 1;
+        // Ground walking physics - responsive, standard 3rd-person controls
+        const isSprinting = keys.ShiftLeft || keys.ShiftRight;
+        const walkSpeed = isSprinting ? 14.0 : 8.5;
 
-        if (moveX !== 0 || moveZ !== 0) {
-          const walkDir = new THREE.Vector3(moveX, 0, moveZ).normalize();
-          walkDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), p.yaw);
-          p.pos.add(walkDir.multiplyScalar(12 * delta));
+        // Calculate movement vector relative to camera orientation!
+        // Camera looks along (sin(camYaw), 0, cos(camYaw)).
+        // Screen-right is (-cos(camYaw), 0, sin(camYaw)), screen-left is (cos(camYaw), 0, -sin(camYaw)).
+        const camForward = new THREE.Vector3(Math.sin(p.camYaw), 0, Math.cos(p.camYaw));
+        const camRight = new THREE.Vector3(-Math.cos(p.camYaw), 0, Math.sin(p.camYaw));
+
+        let moveVector = new THREE.Vector3(0, 0, 0);
+        if (keys.KeyW) moveVector.add(camForward);
+        if (keys.KeyS) moveVector.sub(camForward);
+        if (keys.KeyA) moveVector.sub(camRight); // A goes LEFT
+        if (keys.KeyD) moveVector.add(camRight); // D goes RIGHT
+
+        const isMoving = moveVector.lengthSq() > 0.001;
+        if (isMoving) {
+          moveVector.normalize();
+          p.pos.add(moveVector.clone().multiplyScalar(walkSpeed * delta));
+
+          // Smoothly rotate character model to face movement direction
+          const targetCharYaw = Math.atan2(moveVector.x, moveVector.z);
+          let diff = targetCharYaw - p.yaw;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          p.yaw += diff * Math.min(1.0, 14.0 * delta);
         }
 
-        // Takeoff with space
+        // Keep character firmly on island plateau surface while grounded
+        let onIsland = false;
+        islandConfigs.forEach((cfg) => {
+          const distXZ = new THREE.Vector2(p.pos.x - cfg.pos.x, p.pos.z - cfg.pos.z).length();
+          if (distXZ < cfg.radius * 1.08) {
+            onIsland = true;
+            p.pos.y = cfg.pos.y + 6; // plateau surface
+          }
+        });
+
+        // Walking off the island edge into the open sky naturally transitions to flight!
+        if (!onIsland && p.pos.y > 10) {
+          p.isGrounded = false;
+          p.vel.set(Math.sin(p.yaw) * 16, 2, Math.cos(p.yaw) * 16);
+          p.speed = 16;
+          p.pitch = 0.05;
+          soundSynth.playWingWhoosh();
+          transformAnimTime = 0.9;
+          setIsGroundedUI(false);
+          triggerTransformToastRef.current('Stepped into the Sky — Transformed to Celestial Bird');
+        }
+
+        // Deliberate takeoff with Space
         if (keys.Space) {
           p.isGrounded = false;
-          p.vel.set(0, 14, 0);
-          p.speed = 18;
+          p.vel.set(Math.sin(p.yaw) * 18, 14, Math.cos(p.yaw) * 18);
+          p.speed = 20;
+          p.pitch = 0.15;
           soundSynth.playSpeedBoost();
           soundSynth.playWingWhoosh();
           transformAnimTime = 0.9;
           setIsGroundedUI(false);
-          triggerTransformToastRef.current('Ascended to Flight — Transformed to Celestial Bird');
+          triggerTransformToastRef.current('Spread Wings to the Sky — Transformed to Celestial Bird');
         }
 
-        p.pitch = THREE.MathUtils.lerp(p.pitch, 0, 0.1);
-        p.roll = THREE.MathUtils.lerp(p.roll, 0, 0.1);
+        p.pitch = THREE.MathUtils.lerp(p.pitch, 0, 0.15);
+        p.roll = THREE.MathUtils.lerp(p.roll, 0, 0.15);
+        p.speed = THREE.MathUtils.lerp(p.speed, isMoving ? walkSpeed : 0, 0.2);
       } else {
-        // Airborne Aerodynamics
+        // Airborne Aerodynamics - Fly normally, smoothly, and responsively
         if (isBoosting) {
           setFlightState('BOOSTING');
-          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.85, 0.1);
+          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.65, 0.1);
           p.isGliding = false;
         } else if (isDiving || p.pitch < -0.3) {
           setFlightState('DIVING');
-          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.5, 0.08);
+          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.45, 0.1);
           p.isGliding = false;
-        } else if (Math.abs(p.pitch) < 0.15 && !keys.KeyW && !keys.KeyS) {
+        } else if (Math.abs(p.pitch) < 0.12 && !keys.KeyW && !keys.KeyS) {
           setFlightState('GLIDING');
-          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.0, 0.08);
+          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.0, 0.1);
           p.isGliding = true;
         } else {
           setFlightState('SOARING');
-          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.0, 0.08);
+          p.boostMultiplier = THREE.MathUtils.lerp(p.boostMultiplier, 1.0, 0.1);
           p.isGliding = false;
         }
 
-        // Pitch input (W = dive, S = climb)
-        const pitchTarget = keys.KeyW ? -0.58 : keys.KeyS ? 0.62 : isDiving ? -0.45 : 0.0;
-        p.pitch = THREE.MathUtils.lerp(p.pitch, pitchTarget, 0.08);
-
-        // Yaw & Roll banking input (A = bank left, D = bank right)
+        // Steer left with A, right with D - smooth turning and natural banking
         let turnRate = 0;
         let rollTarget = 0;
         if (keys.KeyA) {
-          turnRate = 1.4;
-          rollTarget = -0.75; // bank left
+          turnRate = 1.65; // Turn LEFT
+          rollTarget = 0.38; // Bank left
         } else if (keys.KeyD) {
-          turnRate = -1.4;
-          rollTarget = 0.75; // bank right
+          turnRate = -1.65; // Turn RIGHT
+          rollTarget = -0.38; // Bank right
         }
         p.yaw += turnRate * delta;
         p.roll = THREE.MathUtils.lerp(p.roll, rollTarget, 0.12);
 
-        // Calculate Forward Airspeed & Thrust
-        let targetSpeed = 16 * p.boostMultiplier;
+        // Pitch input: Normal flight (W dives down, S climbs up) with support for Invert Pitch toggle
+        const pitchDirection = invertPitchRef.current ? -1 : 1;
+        let pitchTarget = 0;
+        if (keys.KeyW) pitchTarget = -0.42 * pitchDirection;
+        else if (keys.KeyS) pitchTarget = 0.45 * pitchDirection;
+        else if (isDiving) pitchTarget = -0.45 * pitchDirection;
+        else pitchTarget = 0.0; // Auto-levels smoothly!
+
+        p.pitch = THREE.MathUtils.lerp(p.pitch, pitchTarget, 0.1);
+
+        // Forward Airspeed
+        let targetSpeed = 20 * p.boostMultiplier;
         if (p.pitch < 0) {
-          targetSpeed += Math.abs(p.pitch) * 24; // gravity dive boost
+          targetSpeed += Math.abs(p.pitch) * 18; // Dive speed gain
         } else if (p.pitch > 0) {
-          targetSpeed -= p.pitch * 11; // climb cost
+          targetSpeed -= p.pitch * 8; // Climb speed reduction
         }
-        p.speed = THREE.MathUtils.lerp(p.speed, Math.max(p.minSpeed, targetSpeed), 0.06);
+        p.speed = THREE.MathUtils.lerp(p.speed, Math.max(p.minSpeed, targetSpeed), 0.08);
 
         // Forward flight vector from Pitch and Yaw
         const forward = new THREE.Vector3(
@@ -2047,22 +2371,18 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
           Math.cos(p.yaw) * Math.cos(p.pitch)
         ).normalize();
 
-        // Lift counteracting gravity
-        const lift = new THREE.Vector3(0, (p.speed / 20) * 9.8 - 9.8, 0);
-        if (isBoosting) {
-          lift.y += 20;
-        }
-
         p.vel.copy(forward.multiplyScalar(p.speed));
-        p.vel.add(lift.multiplyScalar(delta));
+        if (isBoosting) {
+          p.vel.y += 12.0; // Responsive wing thrust lift
+        }
         p.pos.add(p.vel.clone().multiplyScalar(delta));
 
-        // Wing flapping speed & phase: dynamic and continuous flapping
+        // Wing flapping speed & phase
         p.wingFlapSpeed = isBoosting
-          ? 15.5
+          ? 16.0
           : isDiving
-          ? 7.5
-          : Math.max(5.5, 4.2 + (p.speed / p.maxSpeed) * 6.5);
+          ? 8.0
+          : Math.max(5.5, 4.5 + (p.speed / p.maxSpeed) * 6.5);
         p.flappingWingPhase += p.wingFlapSpeed * delta;
 
         // Sound update
@@ -2083,12 +2403,12 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       if (p.isGrounded && !wasGroundedRef.current) {
         wasGroundedRef.current = true;
         setIsGroundedUI(true);
-        setIsGearPanelOpen(true);
         transformAnimTime = 0.9;
       } else if (!p.isGrounded && wasGroundedRef.current) {
         wasGroundedRef.current = false;
         setIsGroundedUI(false);
         transformAnimTime = 0.9;
+        setIntroStep(3);
       }
 
       // Update Transformation Shockwave Visual Effect
@@ -2111,22 +2431,30 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         // Ground Humanoid Pose & Walking Dynamics
         humanoidBody.rotation.set(0, p.yaw, 0);
 
+        // Track intro progress along the straight path
+        if (p.pos.z > -16 && p.pos.z < 25) {
+          setIntroStep((prev) => (prev < 2 ? 2 : prev));
+        }
+
         const isWalking = (keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD);
+        const isSprinting = (keys.ShiftLeft || keys.ShiftRight);
+
         if (isWalking) {
-          walkPhase += delta * 8.5;
+          const moveMultiplier = keys.KeyS && !keys.KeyW ? -1 : 1;
+          walkPhase += delta * (isSprinting ? 12.0 : 8.0) * moveMultiplier;
           const legSwing = Math.sin(walkPhase) * 0.65;
           charLeftLegGroup.rotation.x = legSwing;
           charRightLegGroup.rotation.x = -legSwing;
           charLeftArmGroup.rotation.x = -legSwing * 0.55;
           charRightArmGroup.rotation.x = legSwing * 0.35;
-          charCloak.rotation.x = 0.25 + Math.abs(Math.sin(walkPhase * 2)) * 0.15;
+          charCloak.rotation.x = 0.22 + Math.abs(Math.sin(walkPhase * 2)) * 0.14;
           charTorsoGroup.position.y = 1.8 + Math.abs(Math.sin(walkPhase * 2)) * 0.08;
         } else {
           idlePhase += delta * 2.2;
           const idleBreath = Math.sin(idlePhase) * 0.04;
           charTorsoGroup.position.y = 1.8 + idleBreath;
-          charLeftLegGroup.rotation.x = 0;
-          charRightLegGroup.rotation.x = 0;
+          charLeftLegGroup.rotation.x = THREE.MathUtils.lerp(charLeftLegGroup.rotation.x, 0, 0.2);
+          charRightLegGroup.rotation.x = THREE.MathUtils.lerp(charRightLegGroup.rotation.x, 0, 0.2);
           charLeftArmGroup.rotation.x = Math.sin(idlePhase) * 0.08;
           charRightArmGroup.rotation.x = 0.15 + Math.sin(idlePhase * 1.2) * 0.06;
           charCloak.rotation.x = 0.05 + Math.sin(idlePhase * 1.5) * 0.04;
@@ -2174,7 +2502,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         // Tail Fan Animation: rudders on bank/yaw, spreads on climb, narrows on dive, undulates with flap
         const tailFanSpread = isDiving ? 0.6 : p.pitch > 0.2 ? 1.4 : 1.0;
         tailGroup.scale.x = THREE.MathUtils.lerp(tailGroup.scale.x, tailFanSpread, 0.1);
-        tailGroup.rotation.y = THREE.MathUtils.lerp(tailGroup.rotation.y, (keys.KeyA ? 0.3 : keys.KeyD ? -0.3 : 0), 0.12);
+        tailGroup.rotation.y = THREE.MathUtils.lerp(tailGroup.rotation.y, (keys.KeyA ? -0.3 : keys.KeyD ? 0.3 : 0), 0.12);
         tailGroup.rotation.x = THREE.MathUtils.lerp(tailGroup.rotation.x, -p.pitch * 0.4 + flapSin * 0.12, 0.1);
 
         // Perching Feet Animation: tucked back in flight, extended down on ground
@@ -2273,7 +2601,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         if (distXZ < cfg.radius * 1.4) {
           activeIsland = cfg.island;
 
-          const plateauHeight = cfg.height + 6;
+          const plateauHeight = cfg.pos.y + 6;
           if (distXZ < cfg.radius && Math.abs(p.pos.y - plateauHeight) < 8 && !keys.Space) {
             if (!p.isGrounded && p.vel.y <= 0) {
               p.isGrounded = true;
@@ -2283,8 +2611,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
               soundSynth.playItemObtain();
               transformAnimTime = 0.9;
               setIsGroundedUI(true);
-              setIsGearPanelOpen(true);
-              triggerTransformToastRef.current(`Landed at ${cfg.island.name} — Transformed to Wayfarer & Visible Gear Manifested!`);
+              triggerTransformToastRef.current(`Landed at ${cfg.island.name} — Transformed to Wayfarer [Press G for Gear]`);
             }
           }
 
@@ -2328,76 +2655,99 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       setNearSanctuary(activeSanctuary);
       setNearSanctuaryIsland(activeSanctuary ? activeIsland : null);
 
-      // --- SMOOTH THIRD-PERSON CAMERA WITH SUBTLE SWAY ANIMATIONS ---
-      const baseDistance = cameraMode === 'cinematic' ? 32 : cameraMode === 'firstPerson' ? 3.0 : 14.5;
-      const baseHeight = cameraMode === 'cinematic' ? 9.5 : cameraMode === 'firstPerson' ? 1.2 : 4.2;
+      // --- SMOOTH THIRD-PERSON CAMERA WITH GROUND VS FLIGHT PROFILES ---
+      if (p.isGrounded) {
+        // Ground 3rd-person camera: positions cleanly behind player relative to camYaw & camPitch
+        const groundCamDist = cameraMode === 'cinematic' ? 14.0 : cameraMode === 'firstPerson' ? 0.3 : 7.2;
+        const groundCamHeight = cameraMode === 'firstPerson' ? 1.6 : 2.2;
+        const targetCamPos = new THREE.Vector3(
+          p.pos.x - Math.sin(p.camYaw) * Math.cos(p.camPitch) * groundCamDist,
+          p.pos.y + groundCamHeight + Math.sin(p.camPitch) * groundCamDist * 0.6,
+          p.pos.z - Math.cos(p.camYaw) * Math.cos(p.camPitch) * groundCamDist
+        );
 
-      // Speed-dependent camera distance (pulls back at high speed)
-      const speedOffset = (p.speed / p.maxSpeed) * 3.8;
-      const totalCamDist = baseDistance + speedOffset;
+        camPhysics.pos.lerp(targetCamPos, 1.0 - Math.exp(-12.0 * delta));
+        camera.position.copy(camPhysics.pos);
 
-      // Subtle Sway Animations:
-      // 1. Atmospheric thermal air turbulence sway (Lissajous figure-8)
-      camPhysics.swayTime += delta * 1.35;
-      const tSway = camPhysics.swayTime;
-      const airSpeedFactor = 0.5 + (p.speed / 35) * 0.5;
-      const airSwayX = (Math.sin(tSway * 0.75) * 0.38 + Math.sin(tSway * 1.85) * 0.14) * airSpeedFactor;
-      const airSwayY = (Math.cos(tSway * 0.6) * 0.28 + Math.sin(tSway * 1.4) * 0.12) * airSpeedFactor;
+        const lookTarget = p.pos.clone().add(new THREE.Vector3(0, 1.6, 0));
+        camPhysics.lookAt.lerp(lookTarget, 1.0 - Math.exp(-14.0 * delta));
+        camera.lookAt(camPhysics.lookAt);
+        camera.up.set(0, 1, 0);
+      } else {
+        // Flight camera: tracks smoothly behind the bird's flight heading with smooth look-ahead
+        const speedOffset = (p.speed / p.maxSpeed) * 3.5;
+        const totalCamDist = (cameraMode === 'cinematic' ? 24.0 : cameraMode === 'firstPerson' ? 0.3 : 9.5) + speedOffset;
+        const baseHeight = cameraMode === 'cinematic' ? 6.0 : cameraMode === 'firstPerson' ? 0.8 : 2.5;
 
-      // 2. Wingbeat lift micro-pulse (sync with wing downstroke)
-      const wingbeatPulse = !p.isGrounded && !p.isGliding
-        ? Math.sin(p.flappingWingPhase) * (isBoosting ? 0.26 : 0.14)
-        : 0;
+        const effectiveYaw = p.yaw + p.orbitOffset.x;
+        const effectivePitch = p.pitch * 0.35 + p.orbitOffset.y;
 
-      // 3. Dynamic banking sway (camera rolls and drifts laterally into curves)
-      const bankDriftX = -Math.sin(p.roll) * 1.1;
+        const targetCamPos = new THREE.Vector3(
+          p.pos.x - Math.sin(effectiveYaw) * Math.cos(effectivePitch) * totalCamDist,
+          p.pos.y + baseHeight + Math.sin(effectivePitch) * totalCamDist * 0.5,
+          p.pos.z - Math.cos(effectiveYaw) * Math.cos(effectivePitch) * totalCamDist
+        );
 
-      // Camera base yaw & pitch including mouse orbit offset
-      const camYaw = p.yaw + p.orbitOffset.x;
-      const camPitch = p.pitch * 0.45 + p.orbitOffset.y;
+        camPhysics.pos.lerp(targetCamPos, 1.0 - Math.exp(-9.0 * delta));
+        camera.position.copy(camPhysics.pos);
 
-      const targetCamPos = new THREE.Vector3(
-        p.pos.x - Math.sin(camYaw) * Math.cos(camPitch) * totalCamDist + airSwayX + bankDriftX,
-        p.pos.y + baseHeight + Math.sin(camPitch) * totalCamDist * 0.5 + airSwayY + wingbeatPulse,
-        p.pos.z - Math.cos(camYaw) * Math.cos(camPitch) * totalCamDist
-      );
+        // Gentle camera roll matching flight bank
+        const targetRoll = p.roll * 0.25;
+        camPhysics.roll = THREE.MathUtils.lerp(camPhysics.roll, targetRoll, 0.08);
+        camera.up.set(Math.sin(-camPhysics.roll), Math.cos(camPhysics.roll), 0);
 
-      // Frame-rate independent exponential damping for ultra-smooth follow
-      const posDamp = 1.0 - Math.exp(-7.5 * delta);
-      camPhysics.pos.lerp(targetCamPos, posDamp);
-      camera.position.copy(camPhysics.pos);
+        // Look-ahead target along flight path
+        const lookAheadDist = cameraMode === 'firstPerson' ? 8.0 : 4.5;
+        const forwardDir = new THREE.Vector3(
+          Math.sin(p.yaw),
+          Math.sin(p.pitch) * 0.6,
+          Math.cos(p.yaw)
+        ).normalize();
 
-      // Dynamic Banking Roll on Camera (smooth lag into the turn)
-      const targetRoll = p.roll * 0.32;
-      camPhysics.roll = THREE.MathUtils.lerp(camPhysics.roll, targetRoll, 0.08);
-      camera.up.set(Math.sin(-camPhysics.roll), Math.cos(camPhysics.roll), 0);
+        const targetLookAt = p.pos.clone()
+          .add(new THREE.Vector3(0, 1.0, 0))
+          .add(forwardDir.multiplyScalar(lookAheadDist));
 
-      // Look-ahead target (anticipates flight direction slightly)
-      const lookAheadDistance = cameraMode === 'firstPerson' ? 8 : 4.0;
-      const forwardDir = new THREE.Vector3(
-        Math.sin(p.yaw),
-        Math.sin(p.pitch) * 0.6,
-        Math.cos(p.yaw)
-      ).normalize();
+        camPhysics.lookAt.lerp(targetLookAt, 1.0 - Math.exp(-10.0 * delta));
+        camera.lookAt(camPhysics.lookAt);
+      }
 
-      const targetLookAt = p.pos.clone()
-        .add(new THREE.Vector3(0, 1.2, 0))
-        .add(forwardDir.multiplyScalar(lookAheadDistance));
-
-      const lookDamp = 1.0 - Math.exp(-9.5 * delta);
-      camPhysics.lookAt.lerp(targetLookAt, lookDamp);
-      camera.lookAt(camPhysics.lookAt);
-
-      // Dynamic FOV based on speed (whoosh zoom effect)
-      const targetFOV = 62 + (p.speed / p.maxSpeed) * 16;
+      // Dynamic FOV based on speed (smooth zoom effect)
+      const targetFOV = 60 + (p.speed / p.maxSpeed) * 14;
       camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.06);
       camera.updateProjectionMatrix();
 
+      // --- GRAPHICAL ENHANCEMENTS IN RENDER LOOP ---
+      // Speedlines wind streak visibility
+      if (!p.isGrounded && (p.speed > 22 || isBoosting)) {
+        speedlineMesh.visible = true;
+        speedlineMesh.position.copy(p.pos);
+        speedlineMesh.rotation.set(-p.pitch, p.yaw, 0, 'YXZ');
+        const targetOpacity = Math.min(0.65, (p.speed - 20) / 25 + (isBoosting ? 0.25 : 0));
+        speedlineMat.opacity = THREE.MathUtils.lerp(speedlineMat.opacity, targetOpacity, 0.1);
+      } else {
+        speedlineMesh.visible = false;
+        speedlineMat.opacity = 0;
+      }
+
+      // Contact Drop Shadow on surface
+      if (p.isGrounded) {
+        contactShadow.visible = true;
+        contactShadow.position.set(p.pos.x, p.pos.y - 0.03, p.pos.z);
+      } else {
+        contactShadow.visible = false;
+      }
+
+      // Animated Cloud Sea Breathing
+      if (envRefs.current.cloudSeaMat) {
+        envRefs.current.cloudSeaMat.emissiveIntensity = 0.35 + Math.sin(elapsed * 0.8) * 0.12;
+      }
+
       // --- DYNAMIC DEPTH OF FIELD CONTINUOUS FOCUS TRACKING ---
       if (isDofEnabledRef.current && bokehPass) {
-        // Dynamically lock focus distance to the exact distance between camera and the white bird
-        const distToBird = camera.position.distanceTo(p.pos);
-        bokehPass.uniforms['focus'].value = distToBird;
+        // Dynamically lock focus distance to the exact distance between camera and avatar
+        const distToAvatar = camera.position.distanceTo(p.pos);
+        bokehPass.uniforms['focus'].value = distToAvatar;
         bokehPass.enabled = true;
       } else if (bokehPass) {
         bokehPass.enabled = false;
@@ -2411,8 +2761,11 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         setHeadingDegrees(deg < 0 ? deg + 360 : deg);
       }
 
-      // Render with post-processing depth of field if enabled
-      if (isDofEnabledRef.current) {
+      // Render with post-processing (Bloom + Depth of Field) if either is active
+      if (bloomPassRef.current) {
+        bloomPassRef.current.enabled = bloomEnabledRef.current;
+      }
+      if (isDofEnabledRef.current || bloomEnabledRef.current) {
         composer.render();
       } else {
         renderer.render(scene, camera);
@@ -2430,6 +2783,9 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       canvas.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
       resizeObserver.disconnect();
       renderer.dispose();
     };
@@ -2522,6 +2878,20 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
             ))}
           </div>
 
+          {/* Celestial Bloom Toggle */}
+          <button
+            onClick={() => setBloomEnabled(!bloomEnabled)}
+            className={`p-2.5 rounded-xl backdrop-blur-md border transition-all cursor-pointer shadow-lg flex items-center gap-1.5 text-xs ${
+              bloomEnabled
+                ? 'bg-[#231b2e]/90 border-amber-400/60 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+                : 'bg-[#11161d]/85 border-[#27323f] text-[#94a3b8] hover:text-[#f5efe3]'
+            }`}
+            title="Toggle Celestial Bloom & Atmospheric Glow"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="hidden lg:inline text-[11px] font-semibold">Bloom {bloomEnabled ? 'On' : 'Off'}</span>
+          </button>
+
           {/* Depth of Field (DOF Bokeh) Toggle */}
           <button
             onClick={() => setIsDofEnabled(!isDofEnabled)}
@@ -2534,6 +2904,18 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
           >
             <Focus className="w-4 h-4 text-sky-400" />
             <span className="hidden lg:inline text-[11px] font-semibold">DOF {isDofEnabled ? 'On' : 'Off'}</span>
+          </button>
+
+          {/* Flight Pitch Direction Toggle */}
+          <button
+            onClick={() => setInvertPitch(!invertPitch)}
+            className="p-2.5 rounded-xl bg-[#11161d]/85 backdrop-blur-md border border-[#27323f] text-[#cbd5e1] hover:text-[#f5efe3] hover:border-[#c5a059] transition-all cursor-pointer shadow-lg flex items-center gap-1.5 text-xs"
+            title={`Flight Pitch: ${invertPitch ? 'Inverted (W: Climb, S: Dive)' : 'Standard (W: Dive, S: Climb)'}. Click to switch.`}
+          >
+            <Wind className="w-4 h-4 text-amber-300" />
+            <span className="hidden xl:inline text-[11px]">
+              Pitch: <strong className="text-white font-semibold">{invertPitch ? 'Inverted' : 'Standard'}</strong>
+            </span>
           </button>
 
           {/* Camera View Switcher */}
@@ -2603,6 +2985,82 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         </div>
       </div>
 
+      {/* --- STRAIGHT PATH INTRODUCTION GUIDE BANNER --- */}
+      {showIntroGuide && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-4 pointer-events-none">
+          <div className="pointer-events-auto bg-[#0d121a]/95 backdrop-blur-xl border border-amber-400/40 rounded-2xl p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] text-xs text-[#f1f5f9]">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#232f3e]">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-amber-400" />
+                <span className="font-bold text-amber-300 text-sm">The Straight Path • Introduction</span>
+              </div>
+              <button
+                onClick={() => setShowIntroGuide(false)}
+                className="text-[#94a3b8] hover:text-white p-1 rounded-md hover:bg-white/10 transition-all cursor-pointer text-xs"
+                title="Dismiss Guide"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[#94a3b8] mb-2 text-[11px] leading-relaxed">
+              Welcome, Wayfarer. You begin in your spiritual humanoid form. Walk the straight path to explore:
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div
+                className={`p-2 rounded-xl border transition-all ${
+                  introStep === 1
+                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
+                    : introStep > 1
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : 'bg-[#151c27] border-[#222e3e] text-[#64748b]'
+                }`}
+              >
+                <div className="font-bold text-[11px] flex items-center gap-1 mb-0.5">
+                  <span>1. Walk Ahead</span>
+                </div>
+                <div className="text-[10px] text-[#94a3b8]">
+                  Press <strong className="text-white">W</strong> or <strong className="text-white">↑</strong> along pavers
+                </div>
+              </div>
+
+              <div
+                className={`p-2 rounded-xl border transition-all ${
+                  introStep === 2
+                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm animate-pulse'
+                    : introStep > 2
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : 'bg-[#151c27] border-[#222e3e] text-[#64748b]'
+                }`}
+              >
+                <div className="font-bold text-[11px] flex items-center gap-1 mb-0.5">
+                  <span>2. Sage Elyon</span>
+                </div>
+                <div className="text-[10px] text-[#94a3b8]">
+                  Meet at Sundial & press <strong className="text-white">E</strong>
+                </div>
+              </div>
+
+              <div
+                className={`p-2 rounded-xl border transition-all ${
+                  introStep === 3
+                    ? 'bg-sky-500/20 border-sky-400/60 text-sky-200 shadow-sm'
+                    : 'bg-[#151c27] border-[#222e3e] text-[#64748b]'
+                }`}
+              >
+                <div className="font-bold text-[11px] flex items-center gap-1 mb-0.5">
+                  <span>3. Take Flight</span>
+                </div>
+                <div className="text-[10px] text-[#94a3b8]">
+                  Walk off edge or press <strong className="text-white">Space</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- TRANSFORMATION TOAST BANNER --- */}
       {transformToast && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
@@ -2613,65 +3071,118 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         </div>
       )}
 
-      {/* --- HUD BOTTOM FLIGHT INSTRUMENTS --- */}
+      {/* --- HUD BOTTOM FLIGHT & GROUND INSTRUMENTS --- */}
       <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between pointer-events-none z-10">
-        {/* Flight Speedometer & Altitude Gauges */}
+        {/* Left: Exploration / Flight Profile */}
         <div className="pointer-events-auto flex items-center gap-3">
-          {/* Speedometer */}
-          <div className="px-4 py-3 rounded-2xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#1b232e] text-[#38bdf8]">
-              <Wind className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-wider text-[#64748b] font-semibold block">
-                Airspeed
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-[#f8fafc]">{speedKnots}</span>
-                <span className="text-[10px] text-[#94a3b8] font-mono">knots</span>
+          {isGroundedUI ? (
+            /* Ground Exploration HUD */
+            <div className="px-4 py-3 rounded-2xl bg-[#0f141a]/95 backdrop-blur-md border border-amber-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.5)] flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <Compass className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-200">The Straight Path</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono">
+                    Ground Sanctuary
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#94a3b8] mt-0.5 flex items-center gap-2">
+                  <span>
+                    <strong className="text-white">W / A / S / D</strong> Walk
+                  </span>
+                  <span>•</span>
+                  <span>
+                    <strong className="text-white">Mouse Drag</strong> Look
+                  </span>
+                  <span>•</span>
+                  <span>
+                    <strong className="text-white">Shift</strong> Sprint
+                  </span>
+                  <span>•</span>
+                  <span>
+                    <strong className="text-white">Space</strong> Take Flight
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Altitude Meter */}
-          <div className="px-4 py-3 rounded-2xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#1b232e] text-[#f59e0b]">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-wider text-[#64748b] font-semibold block">
-                Altitude
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-[#f8fafc]">{altitudeMeters}</span>
-                <span className="text-[10px] text-[#94a3b8] font-mono">m</span>
+          ) : (
+            /* Flight Aviation HUD */
+            <>
+              {/* Speedometer */}
+              <div className="px-4 py-3 rounded-2xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[#1b232e] text-[#38bdf8]">
+                  <Wind className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-[#64748b] font-semibold block">
+                    Airspeed
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-mono text-xl font-bold text-[#f8fafc]">{speedKnots}</span>
+                    <span className="text-[10px] text-[#94a3b8] font-mono">knots</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Flight State Indicator */}
-          <div className="hidden sm:flex px-3.5 py-2.5 rounded-xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] items-center gap-2 text-xs">
-            <span className={`w-2 h-2 rounded-full ${isGroundedUI ? 'bg-amber-400' : 'bg-emerald-400'} animate-pulse`} />
-            <span className="font-mono text-[#cbd5e1] font-semibold">
-              {isGroundedUI ? 'GROUNDED • WAYFARER' : flightState}
-            </span>
-          </div>
+              {/* Altitude Meter */}
+              <div className="px-4 py-3 rounded-2xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[#1b232e] text-[#f59e0b]">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-[#64748b] font-semibold block">
+                    Altitude
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-mono text-xl font-bold text-[#f8fafc]">{altitudeMeters}</span>
+                    <span className="text-[10px] text-[#94a3b8] font-mono">m</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flight State Indicator */}
+              <div className="hidden sm:flex px-3.5 py-2.5 rounded-xl bg-[#0f141a]/90 backdrop-blur-md border border-[#232b36] items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-mono text-[#cbd5e1] font-semibold">{flightState}</span>
+              </div>
+            </>
+          )}
 
           {/* Quick Takeoff button when grounded */}
-          {isGroundedUI && (
+          {isGroundedUI ? (
             <button
               onClick={() => {
                 physicsRef.current.isGrounded = false;
                 physicsRef.current.pos.y += 12;
                 physicsRef.current.speed = 20;
+                physicsRef.current.pitch = 0.15;
+                soundSynth.playSpeedBoost();
                 soundSynth.playWingWhoosh();
                 setIsGroundedUI(false);
-                triggerTransformToast('Ascended to Flight — Transformed to Celestial Bird');
+                triggerTransformToast('Spread Wings to the Sky — Transformed to Celestial Bird');
               }}
-              className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg flex items-center gap-1.5 transition-all cursor-pointer border border-sky-300/40"
+              className="px-4 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-[0_0_25px_rgba(56,189,248,0.4)] flex items-center gap-2 transition-all cursor-pointer border border-sky-300/40 active:scale-95"
             >
-              <Feather className="w-3.5 h-3.5" />
+              <Feather className="w-4 h-4" />
               <span>Take Flight [Space]</span>
+            </button>
+          ) : (
+            /* Quick Land button when flying */
+            <button
+              onClick={() => {
+                physicsRef.current.isGrounded = true;
+                physicsRef.current.vel.set(0, 0, 0);
+                soundSynth.playChime(660);
+                soundSynth.playItemObtain();
+                setIsGroundedUI(true);
+                triggerTransformToast('Landed — Transformed to Wayfarer [Press G for Gear]');
+              }}
+              className="px-4 py-3 rounded-2xl bg-[#0f141a]/90 hover:bg-[#1a2332] text-amber-300 font-bold text-xs shadow-lg flex items-center gap-2 transition-all cursor-pointer border border-amber-500/40 active:scale-95"
+            >
+              <MapPin className="w-4 h-4 text-amber-400" />
+              <span>Land Here [F]</span>
             </button>
           )}
         </div>
@@ -2912,9 +3423,9 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
           <div className="bg-[#12171e] border border-[#27323f] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-sm text-[#e2e8f0]">
             <div className="flex items-center justify-between border-b border-[#232c37] pb-3">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-[#c5a059]" />
+                <Compass className="w-5 h-5 text-[#c5a059]" />
                 <h3 className="font-serif-title text-lg font-bold text-[#f5efe3]">
-                  Spiritual White Bird Flight Guide
+                  Wayfarer Controls & Movement Guide
                 </h3>
               </div>
               <button
@@ -2925,46 +3436,68 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">W / S Keys</span>
-                <p className="text-[#94a3b8]">Pitch dive down / climb up into celestial skies</p>
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block mb-1.5">
+                  Ground Movement (Wayfarer Character)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-[#c5a059] font-bold block">W / A / S / D</span>
+                    <p className="text-[#94a3b8]">Walk in any direction relative to camera</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-[#c5a059] font-bold block">Mouse Drag / Touch</span>
+                    <p className="text-[#94a3b8]">Smoothly orbit camera around character</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-[#c5a059] font-bold block">Shift Key</span>
+                    <p className="text-[#94a3b8]">Sprint smoothly across sanctuaries</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-sky-400 font-bold block">Spacebar</span>
+                    <p className="text-[#94a3b8]">Take flight & transform into Celestial Bird</p>
+                  </div>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">A / D Keys</span>
-                <p className="text-[#94a3b8]">Bank left / bank right into aerodynamic curves</p>
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400 block mb-1.5">
+                  Sky Flight (Celestial Bird)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-[#c5a059] font-bold block">W / S (In Air)</span>
+                    <p className="text-[#94a3b8]">Dive down or climb up; auto-levels if released</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-[#c5a059] font-bold block">A / D (In Air)</span>
+                    <p className="text-[#94a3b8]">Steer and bank smoothly left/right</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-amber-300 font-bold block">F Key</span>
+                    <p className="text-[#94a3b8]">Land & transform back to Wayfarer</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#18202a] border border-[#263342] space-y-0.5">
+                    <span className="text-sky-300 font-bold block">Spacebar (In Air)</span>
+                    <p className="text-[#94a3b8]">Wingbeat boost climb into the open sky</p>
+                  </div>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">Spacebar</span>
-                <p className="text-[#94a3b8]">Wing flap thrust / boost climb / takeoff</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">Shift Key</span>
-                <p className="text-[#94a3b8]">High-speed falcon dive with tucked wings</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">T Key / Click</span>
-                <p className="text-[#94a3b8]">Speak with Island NPCs & open chat window</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">G Key</span>
-                <p className="text-[#94a3b8]">Inspect Character Stats & Equipped Gear</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">F Key</span>
-                <p className="text-[#94a3b8]">Toggle Land Transformation / Celestial Flight</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">E Key</span>
-                <p className="text-[#94a3b8]">Land & Enter Island Sanctuary rituals</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">C Key</span>
-                <p className="text-[#94a3b8]">Toggle 3rd Person / Cinematic / 1st Person</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#18202a] border border-[#263342] space-y-1">
-                <span className="text-[#c5a059] font-bold block">Mouse Drag</span>
-                <p className="text-[#94a3b8]">Smooth 360° orbit around the white bird</p>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-2 rounded-xl bg-[#18202a] border border-[#263342] text-center">
+                  <span className="text-emerald-400 font-bold block text-[11px]">E / T Key</span>
+                  <p className="text-[10px] text-[#94a3b8]">Interact / Talk</p>
+                </div>
+                <div className="p-2 rounded-xl bg-[#18202a] border border-[#263342] text-center">
+                  <span className="text-amber-400 font-bold block text-[11px]">G Key</span>
+                  <p className="text-[10px] text-[#94a3b8]">Gear Panel</p>
+                </div>
+                <div className="p-2 rounded-xl bg-[#18202a] border border-[#263342] text-center">
+                  <span className="text-purple-400 font-bold block text-[11px]">C Key</span>
+                  <p className="text-[10px] text-[#94a3b8]">Camera Mode</p>
+                </div>
               </div>
             </div>
 
