@@ -1,0 +1,7 @@
+{
+  "name": "Straight Path Ascension Guide",
+  "description": "Gamified open-world habit RPG featuring traversable habit islands, character exploration, area quests, and spiritual discipline mastery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
