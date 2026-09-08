@@ -24,12 +24,9 @@ import {
   Feather,
   MessageSquare,
   MessageCircle,
-  Send,
-  Loader2,
   BookOpen,
   Flame,
-  Bot,
-  User,
+  RotateCcw,
 } from 'lucide-react';
 import { HabitIsland, CharacterState, QuestStatus, TimeOfDay, WorldArea, GearSlot } from '../types';
 import { HABIT_ISLANDS } from '../data/worldData';
@@ -70,8 +67,8 @@ export interface IslandNPC {
   themeColor: string;
   accentHex: string;
   avatarIcon: 'Compass' | 'Sparkles' | 'Flame' | 'Shield' | 'BookOpen' | 'Feather';
-  greeting: string;
-  suggestedQuestions: string[];
+  avatarEmoji: string;
+  dialogueLines: string[];
   localPos: { x: number; y: number; z: number };
 }
 
@@ -86,11 +83,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'amber',
     accentHex: '#f59e0b',
     avatarIcon: 'Compass',
-    greeting: 'Welcome, noble wayfarer. Here at the celestial crossroads, all five paths of ascension converge. Balance is not accidental—it is the quiet, intentional calibration of every hour. Which realm of your life feels in need of steady calibration today?',
-    suggestedQuestions: [
-      'How do I maintain consistency across all 5 habits without burning out?',
-      'What is the highest virtue of a faceless creator?',
-      'Teach me the principle of quiet stewardship of the soul.',
+    avatarEmoji: '✨',
+    dialogueLines: [
+      'Greetings, noble Wayfarer! You stand at the Crossroads of Ascension, where all five virtues converge.',
+      'Across these boundless skies float five sacred sanctuaries, each protecting an essential pillar of human mastery.',
+      'A scattered mind attempts all things at once and finishes none. True ascension is forged through the quiet, deliberate rhythm of each day.',
+      'Spread your wings (Space) and seek the guardians of each shrine. Let consistency be your anchor among the clouds!',
     ],
     localPos: { x: 5.5, y: 6.0, z: 0 },
   },
@@ -104,11 +102,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'cyan',
     accentHex: '#38bdf8',
     avatarIcon: 'Sparkles',
-    greeting: 'Peace be upon your heart, seeker. The Sanctuary of the Soul was built for those who know that before we face the noise of the world, we must anchor our own heart in pre-dawn stillness. What brings you to this altar today?',
-    suggestedQuestions: [
-      'How can I wake up consistently for morning meditation or prayer without friction?',
-      'How do I quiet persistent internal anxiety during deep breathwork?',
-      'What should I do when my heart feels dry and uninspired?',
+    avatarEmoji: '🕊️',
+    dialogueLines: [
+      'Peace be upon your heart, seeker. You have arrived at the Sanctuary of the Soul.',
+      'Before the world awakes with clamor and endless demands, the morning belongs purely to your spirit.',
+      'Even ten quiet breaths in the pre-dawn silence can calm a storm that would otherwise drown your entire day.',
+      'Anchor your soul here each morning. Stillness is not inaction—it is supreme clarity.',
     ],
     localPos: { x: 18, y: 6.0, z: 14 },
   },
@@ -122,11 +121,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'rose',
     accentHex: '#f43f5e',
     avatarIcon: 'Flame',
-    greeting: 'Welcome to the Chamber. Here, there are no judges—only the warmth of the fire. If you stumbled, missed a daily pillar, or feel burdened by self-blame, lay it down here into the hearth. What friction is troubling you?',
-    suggestedQuestions: [
-      'I broke my meditation streak today and feel paralyzed by guilt. How do I reset?',
-      'How do I conduct an honest evening self-audit without falling into self-loathing?',
-      'What is the difference between healthy remorse and destructive shame?',
+    avatarEmoji: '🔥',
+    dialogueLines: [
+      'Welcome to the Hearth, weary traveler. Sit beside the fire and rest your wings.',
+      'Did you stumble today? Did you break a habit streak or let procrastination steal your daylight?',
+      'Cast the guilt into these glowing embers. Shame is heavy lead that will only drag down your flight.',
+      'An honest evening audit is not about self-punishment—it is about gentle correction. Tomorrow’s dawn arrives clean.',
     ],
     localPos: { x: -16, y: 6.0, z: 15 },
   },
@@ -140,11 +140,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'emerald',
     accentHex: '#10b981',
     avatarIcon: 'Shield',
-    greeting: 'Stand tall, wayfarer! The physical vessel is the sacred temple through which all spiritual and creative energy flows. When you conquer physical inertia, mental clarity follows naturally. What training challenge do you face?',
-    suggestedQuestions: [
-      'How can I stay disciplined with calisthenics or workouts on low-energy days?',
-      'How do I balance intense physical training with demanding deep-work study blocks?',
-      'What daily physical habits yield the highest energy returns?',
+    avatarEmoji: '⚡',
+    dialogueLines: [
+      'Stand tall, Wayfarer! Look at these high cliffs—conquered only through strength and relentless endurance!',
+      'The physical vessel is the sacred engine of all spiritual and creative energy. If the temple crumbles, the mind falters.',
+      'Never wait for motivation. Motivation is a fickle breeze. Discipline is iron forged on the days you least feel like moving.',
+      'Move your body with vigor today! Conquer inertia and command your vitality!',
     ],
     localPos: { x: 18, y: 6.0, z: -14 },
   },
@@ -158,11 +159,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'blue',
     accentHex: '#60a5fa',
     avatarIcon: 'BookOpen',
-    greeting: 'Greetings, seeker of timeless truths. In a culture designed to fragment your mind with infinite notifications, reading an analog book for 30 undisturbed minutes is an act of supreme courage. What knowledge do you seek?',
-    suggestedQuestions: [
-      'How do I silence the urge to check my phone during 30 minutes of deep reading?',
-      'What timeless philosophical or spiritual books should a disciplined wayfarer read first?',
-      'How do I take actionable notes from what I read each day?',
+    avatarEmoji: '📜',
+    dialogueLines: [
+      'Step softly, seeker of timeless truths... within these carved stone arches rest the thoughts of ancient sages.',
+      'In your world, endless fleeting feeds fight relentlessly to fracture your attention into a thousand brittle pieces.',
+      'To sit with an analog book for thirty uninterrupted minutes is an act of supreme courage.',
+      'Feed your mind from deep, quiet wells of timeless wisdom every day. The quality of your thoughts shapes your destiny.',
     ],
     localPos: { x: -18, y: 6.0, z: 14 },
   },
@@ -176,11 +178,12 @@ export const ISLAND_NPCS: IslandNPC[] = [
     themeColor: 'purple',
     accentHex: '#c084fc',
     avatarIcon: 'Feather',
-    greeting: 'Welcome to the Atelier. When you hide your face in your art, you make the work about the idea, the truth, and the beauty—not your ego. Let your craft speak with purity. What creative piece are you shaping?',
-    suggestedQuestions: [
-      'How do I make faceless videos connect deeply with viewers without showing my face?',
-      'How do I ensure my storytelling doesn’t slip into another vanity aesthetic?',
-      'What are the best visual storytelling motifs for contemplative videos?',
+    avatarEmoji: '✒️',
+    dialogueLines: [
+      'Welcome to the Atelier of Creation! Here, we craft with devotion and humility, far from the noise of the ego.',
+      'When you hide your face in your art, you make the work about the idea, the truth, and the beauty—not yourself.',
+      'Do not chase shallow vanity or algorithmic applause. Work quietly and tactilely in your studio.',
+      'Let your craftsmanship speak in a voice so pure and deliberate that it outlasts all fleeting trends.',
     ],
     localPos: { x: 16, y: 6.0, z: -16 },
   },
@@ -208,10 +211,10 @@ function createNPCLabelSprite(name: string, title: string, colorHex: string): TH
     ctx.textAlign = 'center';
     ctx.fillText(name, 256, 70);
 
-    // Title / "[T] Talk" text
+    // Title / "[E / T] Talk" text
     ctx.font = 'bold 22px "Plus Jakarta Sans", sans-serif';
     ctx.fillStyle = colorHex;
-    ctx.fillText(`💬 [T] ${title}`, 256, 110);
+    ctx.fillText(`💬 [E / T] Talk • ${title}`, 256, 110);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
@@ -442,15 +445,13 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
   const triggerTransformToastRef = useRef(triggerTransformToast);
   triggerTransformToastRef.current = triggerTransformToast;
 
-  // NPC Interaction and Chat States
+  // Pokemon-style NPC Interaction and Dialogue States
   const [nearNPC, setNearNPC] = useState<IslandNPC | null>(null);
-  const [chatNPC, setChatNPC] = useState<IslandNPC | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<
-    Record<string, { id: string; sender: 'npc' | 'user'; content: string; timestamp: string }[]>
-  >({});
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
+  const [dialogueNPC, setDialogueNPC] = useState<IslandNPC | null>(null);
+  const [isDialogueOpen, setIsDialogueOpen] = useState(false);
+  const [dialogueLineIndex, setDialogueLineIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
 
   // Interaction Refs for loop access
   const nearSanctuaryRef = useRef<WorldArea | null>(null);
@@ -461,8 +462,19 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
   const nearNPCRef = useRef<IslandNPC | null>(null);
   nearNPCRef.current = nearNPC;
 
-  const isChatOpenRef = useRef(false);
-  isChatOpenRef.current = isChatOpen;
+  const isDialogueOpenRef = useRef(false);
+  isDialogueOpenRef.current = isDialogueOpen;
+
+  const dialogueNPCRef = useRef<IslandNPC | null>(null);
+  dialogueNPCRef.current = dialogueNPC;
+
+  const dialogueLineIndexRef = useRef(0);
+  dialogueLineIndexRef.current = dialogueLineIndex;
+
+  const isTypingRef = useRef(false);
+  isTypingRef.current = isTyping;
+
+  const typewriterTimerRef = useRef<any>(null);
 
   const isDofEnabledRef = useRef(isDofEnabled);
   isDofEnabledRef.current = isDofEnabled;
@@ -477,103 +489,114 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
   const wasGroundedRef = useRef(true);
 
-  // Open Chat with specific NPC
-  const handleOpenNPCChat = useCallback((npc: IslandNPC) => {
-    setChatNPC(npc);
-    setIsChatOpen(true);
-    soundSynth.playItemObtain();
+  // Typewriter effect to display a line character by character like a classic Pokemon NPC
+  const startTypewriter = useCallback((line: string) => {
+    if (typewriterTimerRef.current) {
+      clearInterval(typewriterTimerRef.current);
+      typewriterTimerRef.current = null;
+    }
+    setDisplayedText('');
+    setIsTyping(true);
+    isTypingRef.current = true;
 
-    // Initialize greeting if empty
-    setChatMessages((prev) => {
-      if (prev[npc.id] && prev[npc.id].length > 0) return prev;
-      return {
-        ...prev,
-        [npc.id]: [
-          {
-            id: `init-${npc.id}`,
-            sender: 'npc',
-            content: npc.greeting,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ],
-      };
-    });
+    let charIdx = 0;
+    typewriterTimerRef.current = setInterval(() => {
+      charIdx++;
+      if (charIdx <= line.length) {
+        setDisplayedText(line.slice(0, charIdx));
+        if (charIdx % 3 === 0) {
+          soundSynth.playDialogueLetter();
+        }
+      } else {
+        if (typewriterTimerRef.current) {
+          clearInterval(typewriterTimerRef.current);
+          typewriterTimerRef.current = null;
+        }
+        setIsTyping(false);
+        isTypingRef.current = false;
+      }
+    }, 22);
   }, []);
 
-  // Send message to NPC through Ascension consultation endpoint
-  const handleSendChatMessage = useCallback(
-    async (textToSend: string) => {
-      const text = textToSend || chatInput;
-      if (!text.trim() || !chatNPC || chatLoading) return;
+  // Open Pokemon-style Dialogue with specific NPC
+  const handleOpenNPCDialogue = useCallback(
+    (npc: IslandNPC) => {
+      setDialogueNPC(npc);
+      dialogueNPCRef.current = npc;
+      setDialogueLineIndex(0);
+      dialogueLineIndexRef.current = 0;
+      setIsDialogueOpen(true);
+      isDialogueOpenRef.current = true;
+      soundSynth.playDialogueAdvance();
 
-      const currentNPC = chatNPC;
-      const userMsg = {
-        id: `user-${Date.now()}`,
-        sender: 'user' as const,
-        content: text.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setChatMessages((prev) => ({
-        ...prev,
-        [currentNPC.id]: [...(prev[currentNPC.id] || []), userMsg],
-      }));
-      setChatInput('');
-      setChatLoading(true);
-      soundSynth.playItemObtain();
-
-      try {
-        const streakObj = quests.reduce((acc, q) => {
-          acc[q.questId] = q.currentStreak;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const res = await fetch('/api/ascension/consult', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: `${text.trim()} (Persona instruction: You are speaking as ${currentNPC.name}, "${currentNPC.title}" at ${currentNPC.islandName}. Your role is ${currentNPC.role}. Provide grounded, poetic, and actionable spiritual guidance for their daily habits, remaining fully in character.)`,
-            currentStreaks: streakObj,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error('Consultation request failed');
-        }
-
-        const data = await res.json();
-        const replyText = data.reply || currentNPC.greeting;
-
-        const npcReply = {
-          id: `npc-${Date.now()}`,
-          sender: 'npc' as const,
-          content: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-
-        setChatMessages((prev) => ({
-          ...prev,
-          [currentNPC.id]: [...(prev[currentNPC.id] || []), npcReply],
-        }));
-        soundSynth.playLevelUp();
-      } catch (err) {
-        console.error('NPC Chat error:', err);
-        const fallbackReply = {
-          id: `npc-${Date.now()}`,
-          sender: 'npc' as const,
-          content: `Quiet your heart, wayfarer. Here at ${currentNPC.islandName}, true ascension is forged not through grand declarations, but through the quiet, unbreakable consistency of the daily hour. Keep faith with your morning and evening disciplines.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setChatMessages((prev) => ({
-          ...prev,
-          [currentNPC.id]: [...(prev[currentNPC.id] || []), fallbackReply],
-        }));
-      } finally {
-        setChatLoading(false);
+      if (npc.dialogueLines.length > 0) {
+        startTypewriter(npc.dialogueLines[0]);
       }
     },
-    [chatInput, chatNPC, chatLoading, quests]
+    [startTypewriter]
   );
+
+  // Close Dialogue Box
+  const handleCloseDialogue = useCallback(() => {
+    if (typewriterTimerRef.current) {
+      clearInterval(typewriterTimerRef.current);
+      typewriterTimerRef.current = null;
+    }
+    setIsDialogueOpen(false);
+    isDialogueOpenRef.current = false;
+    setIsTyping(false);
+    isTypingRef.current = false;
+    setDialogueNPC(null);
+    dialogueNPCRef.current = null;
+  }, []);
+
+  const handleCloseDialogueRef = useRef(handleCloseDialogue);
+  handleCloseDialogueRef.current = handleCloseDialogue;
+
+  // Advance dialogue to next line on click/Space/Enter (or finish if on last line)
+  const handleAdvanceDialogue = useCallback(() => {
+    const npc = dialogueNPCRef.current;
+    if (!npc) return;
+
+    // If currently typing, immediately display full line so player can read without waiting!
+    if (isTypingRef.current) {
+      if (typewriterTimerRef.current) {
+        clearInterval(typewriterTimerRef.current);
+        typewriterTimerRef.current = null;
+      }
+      setIsTyping(false);
+      isTypingRef.current = false;
+      const fullLine = npc.dialogueLines[dialogueLineIndexRef.current];
+      setDisplayedText(fullLine);
+      return;
+    }
+
+    // If current line finished typing, proceed to next line or close
+    const nextIdx = dialogueLineIndexRef.current + 1;
+    if (nextIdx < npc.dialogueLines.length) {
+      setDialogueLineIndex(nextIdx);
+      dialogueLineIndexRef.current = nextIdx;
+      soundSynth.playDialogueAdvance();
+      startTypewriter(npc.dialogueLines[nextIdx]);
+    } else {
+      // Completed all lines
+      handleCloseDialogue();
+      soundSynth.playItemObtain();
+    }
+  }, [startTypewriter, handleCloseDialogue]);
+
+  const handleAdvanceDialogueRef = useRef(handleAdvanceDialogue);
+  handleAdvanceDialogueRef.current = handleAdvanceDialogue;
+
+  // Replay dialogue from beginning
+  const handleRestartDialogue = useCallback(() => {
+    const npc = dialogueNPCRef.current;
+    if (!npc) return;
+    setDialogueLineIndex(0);
+    dialogueLineIndexRef.current = 0;
+    soundSynth.playDialogueAdvance();
+    startTypewriter(npc.dialogueLines[0]);
+  }, [startTypewriter]);
 
   // Flight physics state
   const physicsRef = useRef({
@@ -2019,10 +2042,18 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
     // 9. Key Listeners for Flight Controls
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If typing in NPC Chat, don't trigger flight controls
-      if (isChatOpenRef.current) {
+      // If NPC Dialogue is active, intercept navigation keys for Pokemon-style line advancing
+      if (isDialogueOpenRef.current) {
         if (e.code === 'Escape') {
-          setIsChatOpen(false);
+          handleCloseDialogueRef.current();
+          e.preventDefault();
+        } else if (
+          e.code === 'Space' ||
+          e.code === 'Enter' ||
+          e.code === 'KeyE' ||
+          e.code === 'KeyT'
+        ) {
+          handleAdvanceDialogueRef.current();
           e.preventDefault();
         }
         return;
@@ -2039,13 +2070,13 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
       if (e.code === 'KeyT') {
         if (nearNPCRef.current) {
-          handleOpenNPCChat(nearNPCRef.current);
+          handleOpenNPCDialogue(nearNPCRef.current);
           e.preventDefault();
         }
       }
       if (e.code === 'KeyE') {
         if (nearNPCRef.current) {
-          handleOpenNPCChat(nearNPCRef.current);
+          handleOpenNPCDialogue(nearNPCRef.current);
           e.preventDefault();
         } else {
           handleEnterNearestSanctuary();
@@ -2096,7 +2127,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
     // Canvas click: raycast to talkable NPCs
     const handleCanvasClick = (e: MouseEvent) => {
-      if (isChatOpenRef.current) return;
+      if (isDialogueOpenRef.current) return;
       const rect = canvas.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -2108,7 +2139,7 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
       for (const item of npcEntities) {
         const hits = raycaster.intersectObjects(item.group.children, true);
         if (hits.length > 0 && hits[0].distance < 85) {
-          handleOpenNPCChat(item.npc);
+          handleOpenNPCDialogue(item.npc);
           return;
         }
       }
@@ -2776,6 +2807,10 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
 
     // Cleanup
     return () => {
+      if (typewriterTimerRef.current) {
+        clearInterval(typewriterTimerRef.current);
+        typewriterTimerRef.current = null;
+      }
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -3191,18 +3226,18 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         {nearNPC ? (
           <div className="pointer-events-auto flex flex-col items-center gap-2 animate-bounce">
             <button
-              onClick={() => handleOpenNPCChat(nearNPC)}
+              onClick={() => handleOpenNPCDialogue(nearNPC)}
               className="px-6 py-3.5 rounded-2xl text-[#0c0e10] font-bold text-sm shadow-[0_0_35px_rgba(245,158,11,0.6)] flex items-center gap-2.5 transition-all transform active:scale-95 cursor-pointer border border-amber-200/60"
               style={{
                 background: `linear-gradient(135deg, ${nearNPC.accentHex}, #fef08a)`,
               }}
             >
               <MessageSquare className="w-4 h-4 text-[#0c0e10]" />
-              <span>[T] Speak with {nearNPC.name}</span>
+              <span>[E / T] Talk to {nearNPC.name}</span>
               <ChevronRight className="w-4 h-4" />
             </button>
             <span className="text-[11px] text-amber-100 bg-black/75 px-3 py-1 rounded-full backdrop-blur-sm border border-amber-400/40">
-              Press T or Click to consult {nearNPC.title}
+              Press E, T, or Click to hear {nearNPC.title}
             </span>
           </div>
         ) : nearSanctuary ? (
@@ -3251,167 +3286,129 @@ export const FlightWorld3D: React.FC<FlightWorld3DProps> = ({
         <Crosshair className="w-6 h-6 text-[#f8fafc]" />
       </div>
 
-      {/* --- TALKABLE ISLAND NPC CHAT WINDOW MODAL --- */}
-      {isChatOpen && chatNPC && (
-        <div className="absolute inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      {/* --- POKEMON-STYLE ISLAND NPC DIALOGUE BOX --- */}
+      {isDialogueOpen && dialogueNPC && (
+        <div className="absolute inset-x-0 bottom-6 px-4 sm:px-8 md:px-16 pointer-events-none z-50 flex justify-center animate-in fade-in slide-in-from-bottom-6 duration-200">
           <div
-            className="bg-[#10151c]/95 border border-[#273444] rounded-3xl max-w-xl w-full flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden transition-all animate-in fade-in duration-200"
+            id="pokemon-npc-dialogue-box"
+            onClick={handleAdvanceDialogue}
+            className="pointer-events-auto relative w-full max-w-3xl rounded-2xl sm:rounded-3xl border-2 bg-[#0c1117]/95 backdrop-blur-xl p-5 sm:p-6 shadow-[0_12px_45px_rgba(0,0,0,0.85)] cursor-pointer select-none transition-all hover:border-amber-400/80 group"
             style={{
-              boxShadow: `0 0 45px ${chatNPC.accentHex}33`,
+              borderColor: `${dialogueNPC.accentHex}88`,
+              boxShadow: `0 0 35px ${dialogueNPC.accentHex}25, 0 16px 40px rgba(0,0,0,0.9)`,
             }}
           >
-            {/* NPC Header */}
+            {/* NPC Speaker Plate Tag (Top-left Overlap) */}
             <div
-              className="px-6 py-4 border-b border-[#232f3e] flex items-center justify-between"
+              className="absolute -top-5 left-6 px-3.5 py-1.5 rounded-xl border flex items-center gap-2 shadow-lg backdrop-blur-md"
               style={{
-                background: `linear-gradient(90deg, ${chatNPC.accentHex}1a, rgba(16,21,28,0.95))`,
+                backgroundColor: '#111722',
+                borderColor: dialogueNPC.accentHex,
+                boxShadow: `0 0 15px ${dialogueNPC.accentHex}40`,
               }}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shadow-md border border-white/20"
-                  style={{ backgroundColor: `${chatNPC.accentHex}33` }}
-                >
-                  {chatNPC.avatarEmoji}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-serif-title text-base font-bold text-[#f5efe3]">
-                      {chatNPC.name}
-                    </h3>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase border border-white/10"
-                      style={{
-                        backgroundColor: `${chatNPC.accentHex}25`,
-                        color: chatNPC.accentHex,
-                      }}
-                    >
-                      {chatNPC.title}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] flex items-center gap-1.5 mt-0.5">
-                    <MapPin className="w-3 h-3 text-[#c5a059]" />
-                    <span>{chatNPC.islandName} Sanctuary Spirit</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {onOpenGuideTab && (
-                  <button
-                    onClick={() => {
-                      setIsChatOpen(false);
-                      onOpenGuideTab();
-                    }}
-                    className="p-2 rounded-xl bg-[#1a232f] hover:bg-[#253243] text-[#94a3b8] hover:text-[#f8fafc] text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-[#2e3e52]"
-                    title="Open Full Scriptorium Guide"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-[#c5a059]" />
-                    <span className="hidden sm:inline">Scriptorium</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="p-2 rounded-xl text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1f2937] transition-all cursor-pointer"
-                  title="Close Dialogue (Esc)"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Message Scroll Log */}
-            <div className="p-5 flex-1 min-h-[260px] max-h-[380px] overflow-y-auto space-y-3.5 text-sm">
-              {(chatMessages[chatNPC.id] || []).map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex items-start gap-2.5 ${
-                    msg.sender === 'user' ? 'flex-row-reverse' : ''
-                  }`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 ${
-                      msg.sender === 'user'
-                        ? 'bg-[#c5a059] text-[#0c0e10] font-bold'
-                        : 'bg-[#1e293b] text-[#f1f5f9]'
-                    }`}
-                  >
-                    {msg.sender === 'user' ? <User className="w-4 h-4" /> : chatNPC.avatarEmoji}
-                  </div>
-                  <div
-                    className={`max-w-[80%] px-4 py-3 rounded-2xl text-xs sm:text-sm leading-relaxed ${
-                      msg.sender === 'user'
-                        ? 'bg-[#c5a059] text-[#0c0e10] rounded-tr-none font-medium'
-                        : 'bg-[#18212c] text-[#e2e8f0] border border-[#273444] rounded-tl-none'
-                    }`}
-                  >
-                    <p>{msg.content}</p>
-                    <span
-                      className={`text-[10px] block text-right mt-1.5 ${
-                        msg.sender === 'user' ? 'text-[#0c0e10]/70' : 'text-[#64748b]'
-                      }`}
-                    >
-                      {msg.timestamp}
-                    </span>
-                  </div>
-                </div>
-              ))}
-
-              {chatLoading && (
-                <div className="flex items-center gap-2 text-xs text-[#94a3b8] italic">
-                  <div className="w-7 h-7 rounded-lg bg-[#1e293b] flex items-center justify-center text-xs">
-                    {chatNPC.avatarEmoji}
-                  </div>
-                  <div className="px-3.5 py-2 rounded-xl bg-[#18212c] border border-[#273444] flex items-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#c5a059]" />
-                    <span>{chatNPC.name} is communing with the celestial ether...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Dialogue Suggestion Chips */}
-            {chatNPC.suggestedQuestions && chatNPC.suggestedQuestions.length > 0 && (
-              <div className="px-5 py-2.5 bg-[#0d1217]/70 border-t border-[#1e2733] flex flex-wrap gap-1.5">
-                <span className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold w-full block mb-0.5">
-                  Inquire of the Spirit:
-                </span>
-                {chatNPC.suggestedQuestions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendChatMessage(q)}
-                    disabled={chatLoading}
-                    className="px-2.5 py-1 rounded-lg bg-[#19222c] hover:bg-[#253243] text-[11px] text-[#cbd5e1] hover:text-[#f8fafc] border border-[#2c3a4d] transition-all cursor-pointer truncate max-w-full text-left"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Input Bar */}
-            <div className="p-4 bg-[#0d1217] border-t border-[#232f3e] flex items-center gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSendChatMessage();
-                  }
-                }}
-                placeholder={`Ask ${chatNPC.name} for spiritual habit guidance...`}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-[#161d26] border border-[#283546] text-xs sm:text-sm text-[#f8fafc] placeholder-[#64748b] focus:outline-none focus:border-[#c5a059] transition-all"
-              />
-              <button
-                onClick={() => handleSendChatMessage()}
-                disabled={!chatInput.trim() || chatLoading}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#c5a059] to-[#e2bb6f] hover:from-[#d8b268] hover:to-[#ebd089] text-[#0c0e10] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+              <span className="text-base sm:text-lg">{dialogueNPC.avatarEmoji}</span>
+              <span className="font-serif-title font-bold text-xs sm:text-sm text-[#f5efe3]">
+                {dialogueNPC.name}
+              </span>
+              <span className="text-[#64748b] text-xs">•</span>
+              <span
+                className="text-[10px] sm:text-[11px] font-semibold tracking-wide uppercase"
+                style={{ color: dialogueNPC.accentHex }}
               >
-                <span>Send</span>
-                <Send className="w-3.5 h-3.5" />
+                {dialogueNPC.title}
+              </span>
+            </div>
+
+            {/* Top-Right: Quick Actions (Replay, Scriptorium Guide, Close) */}
+            <div
+              className="absolute -top-4 right-6 flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {dialogueLineIndex > 0 && (
+                <button
+                  onClick={handleRestartDialogue}
+                  className="px-2.5 py-1 rounded-lg bg-[#141b24] hover:bg-[#1f2a38] text-[11px] text-[#94a3b8] hover:text-[#f8fafc] border border-[#2a3749] transition-all cursor-pointer flex items-center gap-1 shadow"
+                  title="Replay dialogue from start"
+                >
+                  <RotateCcw className="w-3 h-3 text-[#c5a059]" />
+                  <span className="hidden sm:inline">Restart</span>
+                </button>
+              )}
+              {onOpenGuideTab && (
+                <button
+                  onClick={() => {
+                    handleCloseDialogue();
+                    onOpenGuideTab();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#141b24] hover:bg-[#1f2a38] text-[11px] text-[#94a3b8] hover:text-[#f8fafc] border border-[#2a3749] transition-all cursor-pointer flex items-center gap-1 shadow"
+                  title="Open Scriptorium Guide"
+                >
+                  <BookOpen className="w-3 h-3 text-[#c5a059]" />
+                  <span className="hidden sm:inline">Scriptorium</span>
+                </button>
+              )}
+              <button
+                onClick={handleCloseDialogue}
+                className="p-1 sm:px-2 sm:py-1 rounded-lg bg-[#141b24] hover:bg-[#1f2a38] text-[11px] text-[#94a3b8] hover:text-[#f8fafc] border border-[#2a3749] transition-all cursor-pointer flex items-center gap-1 shadow"
+                title="Close dialogue (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[10px]">Esc</span>
               </button>
+            </div>
+
+            {/* Dialogue Text Content Area */}
+            <div className="pt-2 sm:pt-3 pb-3 min-h-[72px] sm:min-h-[82px] flex items-center">
+              <p className="font-serif-title text-sm sm:text-base md:text-lg text-[#f1f5f9] leading-relaxed tracking-wide">
+                {displayedText}
+                {isTyping && (
+                  <span className="inline-block w-2 h-4 sm:h-5 ml-1 bg-amber-400 animate-pulse align-middle" />
+                )}
+              </p>
+            </div>
+
+            {/* Footer Bar: Dialogue Progress, Key Hints & Classic Pokemon Bouncing Arrow */}
+            <div className="pt-2 border-t border-[#1e2836] flex items-center justify-between text-xs text-[#94a3b8]">
+              {/* Line indicator dots */}
+              <div className="flex items-center gap-1.5">
+                {dialogueNPC.dialogueLines.map((_, idx) => (
+                  <span
+                    key={idx}
+                    className={`h-1.5 rounded-full transition-all ${
+                      idx === dialogueLineIndex
+                        ? 'w-5 bg-amber-400'
+                        : idx < dialogueLineIndex
+                        ? 'w-2.5 bg-amber-600/70'
+                        : 'w-1.5 bg-[#2a3749]'
+                    }`}
+                  />
+                ))}
+                <span className="text-[11px] text-[#64748b] ml-1 font-mono">
+                  {dialogueLineIndex + 1}/{dialogueNPC.dialogueLines.length}
+                </span>
+              </div>
+
+              {/* Right Side: Key Hint & Bouncing Next Arrow */}
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-[#94a3b8] hidden sm:inline">
+                  {isTyping
+                    ? 'Click to skip typing'
+                    : dialogueLineIndex < dialogueNPC.dialogueLines.length - 1
+                    ? 'Click or [Space / Enter / E] to advance'
+                    : 'Click or [Space / Enter / E] to finish'}
+                </span>
+
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/30 border border-amber-500/40 text-amber-300 font-semibold text-xs shadow">
+                  <span>
+                    {dialogueLineIndex < dialogueNPC.dialogueLines.length - 1 ? 'Next' : 'Done'}
+                  </span>
+                  {/* Classic Pokemon-style bouncing dialogue arrow indicator */}
+                  <span className="inline-block text-[11px] animate-bounce text-amber-400 font-bold">
+                    ▼
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
